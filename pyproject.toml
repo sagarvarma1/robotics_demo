@@ -1,0 +1,35 @@
+[project]
+name = "run-like-me"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "brax",
+    "imageio>=2.38.1",
+    "imageio-ffmpeg>=0.8.1",
+    "jax>=0.12.0.1",
+    "mink>=1.4.0",
+    "mujoco>=3.17.0",
+    "mujoco-mjx>=3.17.0",
+    "numpy>=2.5.4",
+    "playground>=0.2.0",
+    "pyyaml>=6.0.3",
+    "scipy>=1.18.1",
+]
+
+[project.optional-dependencies]
+cuda = [
+    "jax[cuda12]>=0.12.0.1 ; sys_platform == 'linux'",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.uv.sources]
+brax = { git = "https://github.com/google/brax.git", rev = "142258dedaf6aa6178e3958540e7c9a7cf6fd46d" }

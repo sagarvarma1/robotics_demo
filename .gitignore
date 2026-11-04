@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+runs/
+out/
+*.mp4
+!docs/media/*.mp4
+
+# Licensed files that must NEVER be committed (non-redistributable)
+body_models/
+**/SMPL*_*.pkl
+**/SMPL*_*.npz
+**/smpl*/*.pkl
+*.ckpt
+*.pth
+*.pt
+hmr4d_results*
+data/private/
