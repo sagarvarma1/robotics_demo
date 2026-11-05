@@ -38,6 +38,8 @@ MjModel before it goes to MJX.
 
 from __future__ import annotations
 
+import re
+
 from pathlib import Path
 from typing import Any
 
@@ -71,7 +73,10 @@ def default_config() -> config_dict.ConfigDict:
         obs=config_dict.create(future_steps=config_dict.placeholder(tuple)),
         reward=config_dict.create(
             weights=config_dict.create(pose=0.65, vel=0.10, ee=0.15, com=0.10),
-            scales=config_dict.create(pose=2.0, vel=0.1, ee=40.0, com=10.0),
+            scales=config_dict.create(pose=2.0, vel=1.0, ee=40.0, com=10.0),
+            # Hinges whose names match this regex have no mocap data (held neutral by the retargeter),
+            # so they are left out of the velocity error. See docs/experiment_log.md.
+            vel_exclude="finger|thumb|toes|hand|wrist",
         ),
         pd=config_dict.create(kp_scale=1.0, kd_scale=1.0),
         termination=config_dict.create(
@@ -117,6 +122,9 @@ class RunImitation(mjx_env.MjxEnv):
         self._parent_ids = jnp.asarray(m.body_parentid[1:])
         self._floor_id = m.geom("floor").id
         self._bad_geom = jnp.asarray(term_lib.bad_geom_table(m, tuple(cfg.termination.contact_bodies)))
+        hinge_names = [m.joint(j).name for j in range(1, m.njnt)]
+        excl = re.compile(cfg.reward.vel_exclude) if cfg.reward.vel_exclude else None
+        self._vel_mask = jnp.asarray([0.0 if excl and excl.search(n) else 1.0 for n in hinge_names])
         self._w = {k: float(cfg.reward.weights[k]) for k in reward_lib.TERMS}
         self._k = {k: float(cfg.reward.scales[k]) for k in reward_lib.TERMS}
         # Actuator a drives joint actuator_trnid[a, 0]. scripts/build_humanoid.py emits actuators
@@ -159,7 +167,8 @@ class RunImitation(mjx_env.MjxEnv):
         com_sim = data.subtree_com[self._root_id]
         errs = reward_lib.errors(
             reward_lib.local_quats(data.xquat, self._parent_ids), fr.local_quat,
-            data.qvel, fr.qvel, ee_sim, root_sim, fr.ee_pos, root_ref, com_sim, fr.com)
+            data.qvel, fr.qvel, ee_sim, root_sim, fr.ee_pos, root_ref, com_sim, fr.com,
+            vel_mask=self._vel_mask)
         reward, terms = reward_lib.tracking_reward(errs, self._w, self._k)
         root_drift = jnp.linalg.norm(root_sim - root_ref)
         mpjpe = jnp.mean(jnp.linalg.norm(data.xpos[1:] - fr.body_pos, axis=-1))

@@ -41,11 +41,21 @@ TERMS = ("pose", "vel", "ee", "com")
 
 
 def errors(sim_local_quat, ref_local_quat, sim_qvel, ref_qvel, sim_ee, sim_root, ref_ee, ref_root,
-           sim_com, ref_com):
-    """The four squared errors that go inside the exponentials."""
+           sim_com, ref_com, vel_mask=None):
+    """The four squared errors that go inside the exponentials.
+
+    Velocity error is the MEAN (not sum) of squared hinge-velocity differences over the joints in
+    `vel_mask`, i.e. the joints that actually have mocap data. Why (docs/experiment_log.md): summed over
+    all 56 hinges, even a near-perfect state gave err ≈ 33, so exp(-0.1·33) ≈ 0.04 and the term never
+    produced a learning signal. Averaging makes k independent of how many joints the body has.
+    """
     dq = quat.mul(quat.conj(sim_local_quat), ref_local_quat)
     e_pose = jnp.sum(quat.angle(dq) ** 2)
-    e_vel = jnp.sum((sim_qvel[6:] - ref_qvel[6:]) ** 2)
+    dv2 = (sim_qvel[6:] - ref_qvel[6:]) ** 2
+    if vel_mask is None:
+        e_vel = jnp.mean(dv2)
+    else:
+        e_vel = jnp.sum(dv2 * vel_mask) / jnp.sum(vel_mask)
     e_ee = jnp.sum(((sim_ee - sim_root) - (ref_ee - ref_root)) ** 2)
     e_com = jnp.sum((sim_com - ref_com) ** 2)
     return {"pose": e_pose, "vel": e_vel, "ee": e_ee, "com": e_com}

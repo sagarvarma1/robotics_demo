@@ -8,7 +8,7 @@ env:
   episode_length: 500          # policy steps (10 s)
   reward:                      # DeepMimic (Peng et al. 2018) weights and scales as the starting point
     weights: {pose: 0.65, vel: 0.10, ee: 0.15, com: 0.10}
-    scales:  {pose: 2.0,  vel: 0.1,  ee: 40.0, com: 10.0}
+    scales:  {pose: 2.0,  vel: 1.0,  ee: 40.0, com: 10.0}   # vel: mean over data joints (see experiment_log)
   pd: {kp_scale: 1.0, kd_scale: 1.0}
   termination:
     max_root_drift: 0.5        # m, distance between sim and reference root

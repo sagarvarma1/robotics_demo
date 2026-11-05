@@ -106,6 +106,10 @@ def metrics_row(step: int, metrics: dict) -> dict:
     return row
 
 
+class _TimeBudgetReached(Exception):
+    """Raised from the checkpoint callback to end training early, right after a checkpoint is saved."""
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("config", nargs="?", help="experiment YAML (omit with --resume)")
@@ -115,6 +119,9 @@ def main() -> None:
                     help="override a config key, e.g. env.motion_path=data/motions/x.npz")
     ap.add_argument("--num-timesteps", type=int, help="override train.num_timesteps for this call")
     ap.add_argument("--runs-root", default="runs")
+    ap.add_argument("--max-hours", type=float, default=None,
+                    help="stop cleanly after the first checkpoint saved past this wall-clock budget "
+                         "(Kaggle sessions are time-limited; this guarantees we end on a resumable checkpoint)")
     args = ap.parse_args()
 
     print("[brax_ppo] jax backend:", jax.default_backend(), jax.devices(),
@@ -171,11 +178,13 @@ def main() -> None:
         normalize_observations=bool(ppo_kw.get("normalize_observations", False)),
         network_factory=network_factory)
 
+    t0 = time.time()
+
     def policy_params_fn(step, make_policy, params):
         if step > 0:
             brax_checkpoint.save(ckpt_dir, offset + int(step), params, ckpt_config)
-
-    t0 = time.time()
+            if args.max_hours is not None and time.time() - t0 > args.max_hours * 3600:
+                raise _TimeBudgetReached(offset + int(step))
 
     def progress_fn(step, metrics):
         row = metrics_row(offset + step, metrics)
@@ -186,18 +195,22 @@ def main() -> None:
             msg += f", ep_len {row['ep_len']:.1f}, mpjpe {row.get('mpjpe', float('nan')):.3f} m"
         print(msg + f", {row['wall_s']} s", flush=True)
 
-    _, params, _ = ppo.train(
-        environment=env,
-        eval_env=eval_env,
-        episode_length=int(env_cfg.get("episode_length", env._config.episode_length)),
-        wrap_env_fn=wrap,
-        network_factory=network_factory,
-        seed=int(cfg.get("seed", 0)) + offset,
-        restore_checkpoint_path=str(restore) if restore else None,
-        policy_params_fn=policy_params_fn,
-        progress_fn=progress_fn,
-        **ppo_kw,
-    )
+    try:
+        _, params, _ = ppo.train(
+            environment=env,
+            eval_env=eval_env,
+            episode_length=int(env_cfg.get("episode_length", env._config.episode_length)),
+            wrap_env_fn=wrap,
+            network_factory=network_factory,
+            seed=int(cfg.get("seed", 0)) + offset,
+            restore_checkpoint_path=str(restore) if restore else None,
+            policy_params_fn=policy_params_fn,
+            progress_fn=progress_fn,
+            **ppo_kw,
+        )
+    except _TimeBudgetReached as e:
+        print(f"[brax_ppo] time budget of {args.max_hours} h reached; stopped cleanly after "
+              f"checkpoint {e.args[0]}. Continue with: --resume {run}")
     last = latest_checkpoint(run)
     print(f"[brax_ppo] done in {time.time() - t0:.1f} s; latest checkpoint: {last}")
 

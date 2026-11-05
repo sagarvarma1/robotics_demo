@@ -18,3 +18,7 @@ the term gives no learning signal and effectively caps the reward at 0.9.
 **Proposed fix (not applied yet).** Exclude the 16 hand/finger/thumb/toe/wrist joints, which have no source data, and
 use the *mean* squared error over the remaining joints with k chosen so a "good" tracking error gives about 0.5.
 Decide after the first GPU baseline run, where we can measure the error distribution of a policy that is actually learning.
+**Fix applied (2026-11-05), before the first GPU run.** Measured on the reference-PD baseline (16 resets): summed
+over 56 hinges, the error was 33 one step after a reset and 124 after 10 steps; averaged over the 42 joints with data
+it was 0.78 and 2.8. Now: mean over data joints (`reward.vel_exclude` regex), with k_vel = 1.0, which gives
+r_vel ≈ 0.46 near the reference and ≈ 0.06 while falling. Check: r_vel one step after a reset went 0.076 → 0.476.
