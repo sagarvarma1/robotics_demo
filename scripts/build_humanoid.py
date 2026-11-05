@@ -136,6 +136,11 @@ def build() -> ET.ElementTree:
     for m in motors:
         act.remove(m)
     import math
+    # Emit actuators in the same order as the hinge joints in qpos (tree order), so that
+    # action[i] drives qpos[7 + i]. dm_control lists them alphabetically, which is a trap:
+    # code that assumes "action i = joint i" silently drives the wrong joints.
+    order = {name: i for i, name in enumerate(joint_range)}
+    motors.sort(key=lambda m: order[m.get("joint")])
     for m in motors:
         name = m.get("joint")
         flim, kp, _ = PD_PARAMS[name]

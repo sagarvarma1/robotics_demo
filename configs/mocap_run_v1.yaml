@@ -1,0 +1,11 @@
+# First real imitation run: CMU subject 16, trial 35 (running), retargeted by motion/.
+base: base.yaml
+name: mocap_run_v1
+env:
+  motion_path: data/motions/cmu_16_35.npz
+train:
+  full_reset: true             # every episode starts at a fresh random phase (RSI); see train/brax_ppo.py
+  num_eval_envs: 128
+  network:
+    policy_hidden_layer_sizes: [512, 256, 128]
+    value_hidden_layer_sizes: [512, 256, 256, 128]

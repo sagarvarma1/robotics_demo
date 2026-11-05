@@ -59,7 +59,8 @@ def _version(pkg: str) -> str | None:
 
 def make_run_dir(cfg: dict, runs_root: str | Path = "runs") -> Path:
     name = cfg.get("name", "exp")
-    run = Path(runs_root) / f"{name}-{time.strftime('%Y%m%d-%H%M%S')}"
+    # Absolute: orbax refuses to write checkpoints to relative paths.
+    run = Path(runs_root).resolve() / f"{name}-{time.strftime('%Y%m%d-%H%M%S')}"
     (run / "checkpoints").mkdir(parents=True, exist_ok=False)
     (run / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False))
     write_meta(run, cfg)
@@ -88,7 +89,7 @@ def write_meta(run: Path, cfg: dict) -> None:
 
 
 def latest_checkpoint(run: str | Path) -> Path | None:
-    ck = Path(run) / "checkpoints"
+    ck = Path(run).resolve() / "checkpoints"  # absolute, for orbax
     steps = [p for p in ck.iterdir() if p.is_dir() and p.name.isdigit()] if ck.exists() else []
     return max(steps, key=lambda p: int(p.name)) if steps else None
 
